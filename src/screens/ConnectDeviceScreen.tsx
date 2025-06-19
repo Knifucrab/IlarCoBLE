@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import BleManager from 'react-native-ble-manager';
+import { useNavigation } from '@react-navigation/native';
 
 type BleDevice = {
   id: string;
@@ -26,6 +27,7 @@ const ConnectDeviceScreen = () => {
   const [bledevices, setBleDevices] = useState<BleDevice[]>([]);
   const BleManagerModule = NativeModules.BleManager;
   const BleManagerEmitter = new NativeEventEmitter(BleManagerModule);
+  const navigation = useNavigation();
 
   useEffect(() => {
     BleManager.start({ showAlert: false }).then(() => {
@@ -117,7 +119,12 @@ const ConnectDeviceScreen = () => {
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{item.name}</Text>
-              <TouchableOpacity style={styles.connectButton}>
+              <TouchableOpacity
+                style={styles.connectButton}
+                onPress={() =>
+                  navigation.navigate('DeviceScreen', { device: item })
+                }
+              >
                 <Text style={styles.connectButtonText}>Connect</Text>
               </TouchableOpacity>
             </View>
@@ -139,6 +146,7 @@ const styles = StyleSheet.create({
   mainViewStyle: {
     flex: 1,
     padding: 20,
+    backgroundColor: '#181A20',
   },
 
   titleText: {

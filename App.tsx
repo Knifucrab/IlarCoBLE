@@ -1,19 +1,35 @@
 import React from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ConnectDeviceScreen from './src/screens/ConnectDeviceScreen';
+import DeviceScreen from './src/screens/DeviceScreen';
+
+const Stack = createNativeStackNavigator();
 
 function App(): JSX.Element {
   return (
-    <SafeAreaView style={styles.container}>
-      <ConnectDeviceScreen />
-    </SafeAreaView>
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="ConnectDeviceScreen"
+        screenOptions={{
+          headerStyle: { backgroundColor: '#23262F' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: 'bold' },
+        }}
+      >
+        <Stack.Screen
+          name="ConnectDeviceScreen"
+          component={ConnectDeviceScreen}
+          options={{ title: 'IlarCo BLE Demo' }}
+        />
+        <Stack.Screen
+          name="DeviceScreen"
+          component={DeviceScreen}
+          options={{ title: 'Device Data' }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
 
 export default App;
