@@ -127,7 +127,7 @@ const DeviceScreen = ({ route }: any) => {
 
       {/* Only show if read characteristic exists */}
       {readCharacteristic && (
-        <View style={{ marginTop: 24 }}>
+        <View style={styles.receivedContainer}>
           <Text style={styles.subHeader}>String received</Text>
           <Text style={styles.receivedText}>{receivedText}</Text>
         </View>
@@ -212,6 +212,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     marginTop: 4,
+  },
+  receivedContainer: {
+    marginTop: 24,
   },
 });
 
