@@ -19,15 +19,26 @@ type BleDevice = {
   serviceData: { [key: string]: any };
   serviceUUIDs: string[];
   isConnectable: boolean;
-  [key: string]: any; // for any additional optional properties
+  [key: string]: any;
 };
+
+// Define your navigation param list
+type RootStackParamList = {
+  ConnectDeviceScreen: undefined;
+  DeviceScreen: { device: BleDevice };
+};
+
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const ConnectDeviceScreen = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [bledevices, setBleDevices] = useState<BleDevice[]>([]);
   const BleManagerModule = NativeModules.BleManager;
   const BleManagerEmitter = new NativeEventEmitter(BleManagerModule);
-  const navigation = useNavigation();
+  const navigation =
+    useNavigation<
+      NativeStackNavigationProp<RootStackParamList, 'ConnectDeviceScreen'>
+    >();
 
   useEffect(() => {
     BleManager.start({ showAlert: false }).then(() => {
@@ -94,16 +105,29 @@ const ConnectDeviceScreen = () => {
         console.log('No devices found');
         startScanning();
       } else {
-        // result.forEach((device: any) => {
-        //   console.log('Found device:', device);
-        // });
-
         const devicesWithName = result.filter(
           (device: any) => device.name && device.name.length > 0
         );
+
+        devicesWithName.forEach((device: any) => {
+          console.log('Found device:', device);
+        });
+
         setBleDevices(devicesWithName);
       }
     });
+  };
+
+  const handleConnect = async (item: BleDevice) => {
+    try {
+      await BleManager.connect(item.id);
+      // Wait a moment for connection to stabilize
+      await new Promise((res) => setTimeout(res, 500));
+      const deviceInfo = await BleManager.retrieveServices(item.id);
+      navigation.navigate('DeviceScreen', { device: item, deviceInfo });
+    } catch (error) {
+      console.warn('Connection failed:', error);
+    }
   };
 
   return (
@@ -121,9 +145,7 @@ const ConnectDeviceScreen = () => {
               <Text style={styles.cardTitle}>{item.name}</Text>
               <TouchableOpacity
                 style={styles.connectButton}
-                onPress={() =>
-                  navigation.navigate('DeviceScreen', { device: item })
-                }
+                onPress={() => handleConnect(item)}
               >
                 <Text style={styles.connectButtonText}>Connect</Text>
               </TouchableOpacity>

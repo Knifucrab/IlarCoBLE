@@ -1,11 +1,89 @@
-import React from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  Button,
+  TextInput,
+  Alert,
+} from 'react-native';
+import BleManager from 'react-native-ble-manager';
+
+const SERVICE_UUID = '01010101-0000-1000-8000-00805f9b34fb'; // 128-bit format
 
 const DeviceScreen = ({ route }: any) => {
-  const { device } = route.params;
+  const { device, deviceInfo } = route.params;
+  const [message, setMessage] = useState('');
 
-  // Flatten device object into key-value pairs for FlatList
-  const data = Object.entries(device).map(([key, value]) => ({
+  // Check for the service
+  const hasCustomService = deviceInfo?.services?.some(
+    (s: any) => s.uuid?.toLowerCase() === SERVICE_UUID.toLowerCase()
+  );
+
+  // Find a writable characteristic in the service
+  const getWritableCharacteristic = () => {
+    if (!deviceInfo?.characteristics) {
+      return null;
+    }
+    return deviceInfo.characteristics.find(
+      (c: any) =>
+        c.service?.toLowerCase() === SERVICE_UUID.toLowerCase() &&
+        (c.properties.Write || c.properties.WriteWithoutResponse)
+    );
+  };
+
+  const handleSend = async () => {
+    const char = getWritableCharacteristic();
+    if (!char) {
+      Alert.alert('No writable characteristic found');
+      return;
+    }
+    try {
+      // Convert string to bytes (UTF-8)
+      const encodeToBytes = (str: string) => {
+        // Simple UTF-8 encoding for React Native (no TextEncoder)
+        let utf8 = [];
+        for (let i = 0; i < str.length; i++) {
+          let charcode = str.charCodeAt(i);
+          if (charcode < 0x80) {
+            utf8.push(charcode);
+          } else if (charcode < 0x800) {
+            utf8.push(0xc0 | (charcode >> 6));
+            utf8.push(0x80 | (charcode & 0x3f));
+          } else if (charcode < 0xd800 || charcode >= 0xe000) {
+            utf8.push(0xe0 | (charcode >> 12));
+            utf8.push(0x80 | ((charcode >> 6) & 0x3f));
+            utf8.push(0x80 | (charcode & 0x3f));
+          } else {
+            // surrogate pair
+            i++;
+            charcode =
+              0x10000 +
+              (((charcode & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff));
+            utf8.push(0xf0 | (charcode >> 18));
+            utf8.push(0x80 | ((charcode >> 12) & 0x3f));
+            utf8.push(0x80 | ((charcode >> 6) & 0x3f));
+            utf8.push(0x80 | (charcode & 0x3f));
+          }
+        }
+        return utf8;
+      };
+      const data = encodeToBytes(message);
+      await BleManager.write(
+        device.id,
+        SERVICE_UUID,
+        char.characteristic,
+        data
+      );
+      Alert.alert('Message sent!');
+    } catch (e) {
+      Alert.alert('Send failed', String(e));
+    }
+  };
+
+  // Flatten deviceInfo for display
+  const data = Object.entries(deviceInfo || {}).map(([key, value]) => ({
     key,
     value: typeof value === 'object' ? JSON.stringify(value) : String(value),
   }));
@@ -23,6 +101,18 @@ const DeviceScreen = ({ route }: any) => {
         )}
         keyExtractor={(item) => item.key}
       />
+      {hasCustomService && (
+        <View style={styles.sendContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Type message"
+            placeholderTextColor="#888"
+            value={message}
+            onChangeText={setMessage}
+          />
+          <Button title="Send Message" onPress={handleSend} />
+        </View>
+      )}
     </View>
   );
 };
@@ -39,6 +129,14 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', marginBottom: 8 },
   key: { color: '#fff', fontWeight: 'bold', width: 120 },
   value: { color: '#fff', flex: 1, flexWrap: 'wrap' },
+  sendContainer: { marginTop: 24 },
+  input: {
+    backgroundColor: '#23262F',
+    color: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
 });
 
 export default DeviceScreen;
