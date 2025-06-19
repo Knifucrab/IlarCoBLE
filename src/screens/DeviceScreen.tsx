@@ -4,7 +4,7 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  Button,
+  TouchableOpacity,
   TextInput,
   Alert,
 } from 'react-native';
@@ -55,35 +55,58 @@ const DeviceScreen = ({ route }: any) => {
     }
   };
 
-  // Flatten deviceInfo for display
-  const data = Object.entries(deviceInfo || {}).map(([key, value]) => ({
-    key,
-    value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-  }));
+  const filteredData = [
+    { key: 'id', value: deviceInfo?.id || device?.id || '' },
+    { key: 'services', value: deviceInfo?.services || [] },
+  ];
+
+  const renderItem = ({ item }: { item: { key: string; value: any } }) => {
+    if (item.key === 'services') {
+      return (
+        <View style={styles.row}>
+          <Text style={styles.key}>services:</Text>
+          <FlatList
+            data={item.value}
+            renderItem={({ item: service }) => (
+              <Text style={styles.value}>{service.uuid}</Text>
+            )}
+            keyExtractor={(service) => service.uuid}
+          />
+        </View>
+      );
+    }
+    return (
+      <View style={styles.row}>
+        <Text style={styles.key}>{item.key}:</Text>
+        <Text style={styles.value}>{item.value}</Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>{device.name || 'Device Data'}</Text>
       <FlatList
-        data={data}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={styles.key}>{item.key}:</Text>
-            <Text style={styles.value}>{item.value}</Text>
-          </View>
-        )}
+        data={filteredData}
+        renderItem={renderItem}
         keyExtractor={(item) => item.key}
+        style={styles.flatList}
       />
       {hasCustomService && (
         <View style={styles.sendContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type message"
-            placeholderTextColor="#888"
-            value={message}
-            onChangeText={setMessage}
-          />
-          <Button title="Send Message" onPress={handleSend} />
+          <Text style={styles.subHeader}>Send Message</Text>
+          <View style={styles.rowCenter}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type message"
+              placeholderTextColor="#888"
+              value={message}
+              onChangeText={setMessage}
+            />
+            <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+              <Text style={styles.sendButtonText}>Send</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -91,7 +114,11 @@ const DeviceScreen = ({ route }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#181A20', padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: '#181A20',
+    padding: 16,
+  },
   header: {
     color: '#fff',
     fontSize: 22,
@@ -99,16 +126,45 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  subHeader: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
   row: { flexDirection: 'row', marginBottom: 8 },
   key: { color: '#fff', fontWeight: 'bold', width: 120 },
   value: { color: '#fff', flex: 1, flexWrap: 'wrap' },
-  sendContainer: { marginTop: 24 },
+  sendContainer: { marginTop: 24, borderColor: 'red' },
+  rowCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   input: {
     backgroundColor: '#23262F',
     color: '#fff',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 12,
+    flex: 8,
+  },
+  flatList: {
+    flexGrow: 0,
+  },
+  sendButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#34a4eb',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    marginLeft: 12,
+    flex: 2,
+  },
+  sendButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
