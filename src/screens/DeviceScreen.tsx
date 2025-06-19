@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,48 +7,80 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  NativeModules,
+  NativeEventEmitter,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
 import { encodeToBytes } from '../helpers/bleUtils';
 
-const SERVICE_UUID = '01010101-0000-1000-8000-00805f9b34fb'; // 128-bit format
+const SERVICE_UUID = '01010101-0000-1000-8000-00805f9b34fb';
+const WRITE_CHAR_UUID = '02020202-0000-1000-8000-00805f9b34fb';
+const READ_CHAR_UUID = '03030303-0000-1000-8000-00805f9b34fb';
 
 const DeviceScreen = ({ route }: any) => {
   const { device, deviceInfo } = route.params;
   const [message, setMessage] = useState('');
+  const [receivedText, setReceivedText] = useState('No text received');
 
-  // Check for the service
-  const hasCustomService = deviceInfo?.services?.some(
-    (s: any) => s.uuid?.toLowerCase() === SERVICE_UUID.toLowerCase()
+  const BleManagerEmitter = useMemo(
+    () => new NativeEventEmitter(NativeModules.BleManager),
+    []
   );
 
-  // Find a writable characteristic in the service
-  const getWritableCharacteristic = () => {
-    if (!deviceInfo?.characteristics) {
-      return null;
+  // Find the read/notify characteristic
+  const readCharacteristic = deviceInfo?.characteristics?.find(
+    (c: any) =>
+      c.service?.toLowerCase() === SERVICE_UUID.toLowerCase() &&
+      c.characteristic?.toLowerCase() === READ_CHAR_UUID.toLowerCase() &&
+      c.properties.Notify
+  );
+
+  // Find the write characteristic
+  const writeCharacteristic = deviceInfo?.characteristics?.find(
+    (c: any) =>
+      c.service?.toLowerCase() === SERVICE_UUID.toLowerCase() &&
+      c.characteristic?.toLowerCase() === WRITE_CHAR_UUID.toLowerCase() &&
+      (c.properties.Write || c.properties.WriteWithoutResponse)
+  );
+
+  // Enable notifications for the read characteristic
+  useEffect(() => {
+    if (readCharacteristic) {
+      BleManager.startNotification(device.id, SERVICE_UUID, READ_CHAR_UUID)
+        .then(() => {
+          console.log('Notification started');
+        })
+        .catch((err) => {
+          console.warn('Notification error', err);
+        });
     }
-    return deviceInfo.characteristics.find(
-      (c: any) =>
-        c.service?.toLowerCase() === SERVICE_UUID.toLowerCase() &&
-        (c.properties.Write || c.properties.WriteWithoutResponse)
+  }, [device, readCharacteristic]);
+
+  // Listen for notifications
+  useEffect(() => {
+    const subscription = BleManagerEmitter.addListener(
+      'BleManagerDidUpdateValueForCharacteristic',
+      ({ value, service, characteristic }) => {
+        if (
+          service?.toLowerCase() === SERVICE_UUID.toLowerCase() &&
+          characteristic?.toLowerCase() === READ_CHAR_UUID.toLowerCase()
+        ) {
+          const text = String.fromCharCode(...value);
+          setReceivedText(text);
+        }
+      }
     );
-  };
+    return () => subscription.remove();
+  }, [BleManagerEmitter]);
 
   const handleSend = async () => {
-    const char = getWritableCharacteristic();
-    if (!char) {
+    if (!writeCharacteristic) {
       Alert.alert('No writable characteristic found');
       return;
     }
     try {
-      // Convert string to bytes (UTF-8)
       const data = encodeToBytes(message);
-      await BleManager.write(
-        device.id,
-        SERVICE_UUID,
-        char.characteristic,
-        data
-      );
+      await BleManager.write(device.id, SERVICE_UUID, WRITE_CHAR_UUID, data);
       Alert.alert('Message sent!');
     } catch (e) {
       Alert.alert('Send failed', String(e));
@@ -92,7 +124,17 @@ const DeviceScreen = ({ route }: any) => {
         keyExtractor={(item) => item.key}
         style={styles.flatList}
       />
-      {hasCustomService && (
+
+      {/* Only show if read characteristic exists */}
+      {readCharacteristic && (
+        <View style={{ marginTop: 24 }}>
+          <Text style={styles.subHeader}>String received</Text>
+          <Text style={styles.receivedText}>{receivedText}</Text>
+        </View>
+      )}
+
+      {/* Only show if write characteristic exists */}
+      {writeCharacteristic && (
         <View style={styles.sendContainer}>
           <Text style={styles.subHeader}>Send Message</Text>
           <View style={styles.rowCenter}>
@@ -135,7 +177,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', marginBottom: 8 },
   key: { color: '#fff', fontWeight: 'bold', width: 120 },
   value: { color: '#fff', flex: 1, flexWrap: 'wrap' },
-  sendContainer: { marginTop: 24, borderColor: 'red' },
+  sendContainer: { marginTop: 24 },
   rowCenter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -165,6 +207,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  receivedText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 4,
   },
 });
 
