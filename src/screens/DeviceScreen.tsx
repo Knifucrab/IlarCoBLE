@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
+import { encodeToBytes } from '../helpers/bleUtils';
 
 const SERVICE_UUID = '01010101-0000-1000-8000-00805f9b34fb'; // 128-bit format
 
@@ -41,34 +42,6 @@ const DeviceScreen = ({ route }: any) => {
     }
     try {
       // Convert string to bytes (UTF-8)
-      const encodeToBytes = (str: string) => {
-        // Simple UTF-8 encoding for React Native (no TextEncoder)
-        let utf8 = [];
-        for (let i = 0; i < str.length; i++) {
-          let charcode = str.charCodeAt(i);
-          if (charcode < 0x80) {
-            utf8.push(charcode);
-          } else if (charcode < 0x800) {
-            utf8.push(0xc0 | (charcode >> 6));
-            utf8.push(0x80 | (charcode & 0x3f));
-          } else if (charcode < 0xd800 || charcode >= 0xe000) {
-            utf8.push(0xe0 | (charcode >> 12));
-            utf8.push(0x80 | ((charcode >> 6) & 0x3f));
-            utf8.push(0x80 | (charcode & 0x3f));
-          } else {
-            // surrogate pair
-            i++;
-            charcode =
-              0x10000 +
-              (((charcode & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff));
-            utf8.push(0xf0 | (charcode >> 18));
-            utf8.push(0x80 | ((charcode >> 12) & 0x3f));
-            utf8.push(0x80 | ((charcode >> 6) & 0x3f));
-            utf8.push(0x80 | (charcode & 0x3f));
-          }
-        }
-        return utf8;
-      };
       const data = encodeToBytes(message);
       await BleManager.write(
         device.id,
